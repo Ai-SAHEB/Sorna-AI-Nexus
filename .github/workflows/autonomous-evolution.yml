@@ -21,15 +21,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-       - name: Clean requirements.txt
-  run: |
-    # حذف sqlite3 از requirements.txt
-    if [ -f "requirements.txt" ]; then
-      grep -v "sqlite3" requirements.txt > temp.txt
-      mv temp.txt requirements.txt
-      echo "✅ sqlite3 removed from requirements.txt"
-      cat requirements.txt
-    fi 
     
     - name: Install dependencies
       run: |
