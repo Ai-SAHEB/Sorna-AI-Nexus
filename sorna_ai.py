@@ -1018,20 +1018,7 @@ class AdvancedAutonomousAgent:
         """راه‌اندازی پایگاه داده"""
         self.conn = sqlite3.connect(self.knowledge_base_path)
         cursor = self.conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS advanced_knowledge (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                concept TEXT UNIQUE,
-                description TEXT,
-                category TEXT,
-                confidence REAL,
-                usage_count INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
+    cursor.execute("CREATE TABLE IF NOT EXISTS advanced_knowledge (id INTEGER PRIMARY KEY AUTOINCREMENT, concept TEXT UNIQUE, description TEXT, category TEXT, confidence REAL, usage_count INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")    
         self.conn.commit()
         print(f"✅ عامل {self.name} راه‌اندازی شد")
     
@@ -1039,14 +1026,8 @@ class AdvancedAutonomousAgent:
         """یادگیری مفهوم جدید با مدیریت پیشرفته"""
         try:
             cursor = self.conn.cursor()
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO advanced_knowledge 
-                (concept, description, category, confidence, last_used, usage_count)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 
-                COALESCE((SELECT usage_count FROM advanced_knowledge WHERE concept = ?), 0) + 1)
-            ''', (concept, description, category, confidence, concept))
-            
+   cursor.execute("INSERT OR REPLACE INTO advanced_knowledge (concept, description, category, confidence, last_used, usage_count) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, COALESCE((SELECT usage_count FROM advanced_knowledge WHERE concept = ?), 0) + 1)", (concept, description, category, confidence, concept))         
+                       
             self.conn.commit()
             self.experience_count += 1
             
@@ -1061,10 +1042,7 @@ class AdvancedAutonomousAgent:
         """دریافت دانش با مدیریت خطا"""
         try:
             cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT concept, description, category, confidence, usage_count 
-                FROM advanced_knowledge WHERE concept = ?
-            ''', (concept,))
+         cursor.execute("SELECT concept, description, category, confidence, usage_count FROM advanced_knowledge WHERE concept = ?", (concept,))   
             
             result = cursor.fetchone()
             if result:
