@@ -1010,12 +1010,7 @@ class AdvancedAutonomousAgent:
         self.creation_time = datetime.now()
         
         # پایگاه دانش پیشرفته
-        self.knowledge_base = {
-            'concepts': {},
-            'patterns': {},
-            'experiences': [],
-            'decisions': []
-        }
+        self.knowledge_base = {'concepts': {},'patterns': {},'experiences': {},'decisions': [] }
         
         self.setup_database()
     
