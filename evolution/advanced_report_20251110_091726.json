@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-11-10T09:17:26.125025",
+  "total_knowledge": 18,
+  "total_experiences": 25,
+  "category_diversity": 14,
+  "average_confidence": 0.853,
+  "performance_score": 0.771,
+  "evolution_level": 15,
+  "recommendations": [
+    "افزایش شدت یادگیری از منابع اینترنتی",
+    "اضافه کردن منابع یادگیری جدید",
+    "بررسی مستمر عملکرد سیستم",
+    "آپدیت دوره‌ای کد منبع",
+    "گسترش قابلیت‌های GitHub integration"
+  ],
+  "component_scores": {
+    "knowledge": 0.36,
+    "experience": 1.0,
+    "confidence": 0.853,
+    "diversity": 1.0
+  }
+}
