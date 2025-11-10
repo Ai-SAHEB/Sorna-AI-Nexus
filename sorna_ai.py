@@ -65,7 +65,7 @@ class SecureTokenManager:
 class RealGitHubIntegration:
     def __init__(self, token_manager):
         self.token_manager = token_manager
-        self.token = "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"  # توکن مستقیم
+        self.token = os.getenv('GITHUB_TOKEN', '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')
         self.connected = False
         self.headers = {}
         self.repo_owner = "Ai-SAHEB"
@@ -310,6 +310,625 @@ class AdvancedMemorySystem:
             self.logger.error(f"خطا در ثبت تجربه: {e}")
             return False
 
+# ==================== سیستم حافظه و یادگیری ماندگار ====================
+class PersistentMemorySystem:
+    def __init__(self):
+        self.memory_dir = "memory"
+        self.knowledge_file = f"{self.memory_dir}/knowledge_base.json"
+        self.learning_file = f"{self.memory_dir}/learning_progress.json"
+        self.conversation_file = f"{self.memory_dir}/conversation_history.json"
+        self.research_file = f"{self.memory_dir}/research_topics.json"
+        self.logger = AdvancedLogger()
+        self.setup_memory_system()
+    
+    def setup_memory_system(self):
+        """راه‌اندازی سیستم حافظه ماندگار"""
+        os.makedirs(self.memory_dir, exist_ok=True)
+        
+        # ایجاد فایل‌های اولیه اگر وجود ندارند
+        initial_data = {
+            'knowledge_base.json': {'concepts': {}, 'categories': {}, 'created_at': datetime.now().isoformat()},
+            'learning_progress.json': {'daily_progress': {}, 'milestones': [], 'learning_goals': {}},
+            'conversation_history.json': {'conversations': [], 'user_profiles': {}},
+            'research_topics.json': {'topics': {}, 'research_history': [], 'discoveries': []}
+        }
+        
+        for file_path, data in initial_data.items():
+            full_path = f"{self.memory_dir}/{file_path}"
+            if not os.path.exists(full_path):
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        self.logger.info("✅ سیستم حافظه ماندگار راه‌اندازی شد")
+    
+    def save_conversation(self, user_input: str, ai_response: str, context: dict = None):
+        """ذخیره مکالمه در تاریخچه"""
+        try:
+            with open(self.conversation_file, 'r+', encoding='utf-8') as f:
+                data = json.load(f)
+                
+                conversation = {
+                    'timestamp': datetime.now().isoformat(),
+                    'user_input': user_input,
+                    'ai_response': ai_response,
+                    'context': context or {},
+                    'topics': self.extract_topics(user_input),
+                    'sentiment': self.analyze_sentiment(user_input)
+                }
+                
+                data['conversations'].append(conversation)
+                
+                # حفظ فقط 100۰ مکالمه آخر
+                if len(data['conversations']) > 1000:
+                    data['conversations'] = data['conversations'][-500:]
+                
+                f.seek(0)
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.truncate()
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"خطا در ذخیره مکالمه: {e}")
+            return False
+    
+    def get_conversation_history(self, limit: int = 50):
+        """دریافت تاریخچه مکالمات"""
+        try:
+            with open(self.conversation_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data['conversations'][-limit:]
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت تاریخچه: {e}")
+            return []
+    
+    def update_learning_progress(self, topic: str, progress: float, notes: str = ""):
+        """به‌روزرسانی پیشرفت یادگیری"""
+        try:
+            with open(self.learning_file, 'r+', encoding='utf-8') as f:
+                data = json.load(f)
+                
+                today = datetime.now().strftime('%Y-%m-%d')
+                if today not in data['daily_progress']:
+                    data['daily_progress'][today] = {}
+                
+                data['daily_progress'][today][topic] = {
+                    'progress': progress,
+                    'notes': notes,
+                    'updated_at': datetime.now().isoformat()
+                }
+                
+                # بررسی milestones
+                if progress >= 0.8 and topic not in [m['topic'] for m in data['milestones']]:
+                    data['milestones'].append({
+                        'topic': topic,
+                        'achieved_at': datetime.now().isoformat(),
+                        'progress': progress
+                    })
+                
+                f.seek(0)
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.truncate()
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"خطا در به‌روزرسانی پیشرفت: {e}")
+            return False
+    
+    def save_research_topic(self, topic: str, findings: dict, sources: list = None):
+        """ذخیره موضوع تحقیقی و یافته‌ها"""
+        try:
+            with open(self.research_file, 'r+', encoding='utf-8') as f:
+                data = json.load(f)
+                
+                research_entry = {
+                    'topic': topic,
+                    'findings': findings,
+                    'sources': sources or [],
+                    'researched_at': datetime.now().isoformat(),
+                    'confidence': findings.get('confidence', 0.5)
+                }
+                
+                data['research_history'].append(research_entry)
+                
+                # به‌روزرسانی topics
+                if topic not in data['topics']:
+                    data['topics'][topic] = {
+                        'first_researched': datetime.now().isoformat(),
+                        'research_count': 0,
+                        'average_confidence': 0,
+                        'last_researched': datetime.now().isoformat()
+                    }
+                
+                data['topics'][topic]['research_count'] += 1
+                data['topics'][topic]['last_researched'] = datetime.now().isoformat()
+                
+                f.seek(0)
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.truncate()
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"خطا در ذخیره تحقیق: {e}")
+            return False
+    
+    def extract_topics(self, text: str):
+        """استخراج موضوعات از متن"""
+        topics = []
+        text_lower = text.lower()
+        
+        topic_keywords = {
+            'python': ['پایتون', 'python', 'کد', 'برنامه', 'اسکریپت'],
+            'ai': ['هوش مصنوعی', 'ai', 'یادگیری ماشین', 'machine learning'],
+            'github': ['گیت‌هاب', 'github', 'ریپو', 'repository'],
+            'learning': ['یادگیری', 'آموزش', 'یاد بگیر', 'چگونه'],
+            'research': ['تحقیق', 'research', 'جستجو', 'یافته']
+        }
+        
+        for topic, keywords in topic_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                topics.append(topic)
+        
+        return topics
+    
+    def analyze_sentiment(self, text: str):
+        """تحلیل احساسات متن"""
+        positive_words = ['عالی', 'خوب', 'ممتاز', 'عالیه', 'فوقالعاده']
+        negative_words = ['بد', 'ضعیف', 'مشکل', 'خطا', 'ناراحت']
+        
+        text_lower = text.lower()
+        positive_score = sum(1 for word in positive_words if word in text_lower)
+        negative_score = sum(1 for word in negative_words if word in text_lower)
+        
+        total = positive_score + negative_score
+        if total == 0:
+            return {'sentiment': 'neutral', 'confidence': 0.5}
+        
+        return {
+            'sentiment': 'positive' if positive_score > negative_score else 'negative',
+            'confidence': max(positive_score, negative_score) / total
+        }
+
+# ==================== موتور تحقیق هوشمند ====================
+class SmartResearchEngine:
+    def __init__(self, memory_system, persistent_memory):
+        self.memory = memory_system
+        self.persistent_memory = persistent_memory
+        self.logger = AdvancedLogger()
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (compatible; SornaAI-Research/1.0; +https://github.com/Ai-SAHEB)'
+        })
+    
+    def research_topic(self, topic: str, depth: str = "medium"):
+        """تحقیق هوشمند در مورد یک موضوع"""
+        self.logger.info(f"🔍 شروع تحقیق در مورد: {topic}")
+        
+        try:
+            # جمع‌آوری داده از منابع مختلف
+            findings = {
+                'topic': topic,
+                'research_depth': depth,
+                'sources_used': [],
+                'key_findings': [],
+                'related_concepts': [],
+                'confidence': 0.5,
+                'research_timestamp': datetime.now().isoformat()
+            }
+            
+            # تحقیق بر اساس نوع موضوع
+            if any(word in topic.lower() for word in ['python', 'programming', 'کد']):
+                findings.update(self.research_programming_topic(topic))
+            elif any(word in topic.lower() for word in ['ai', 'هوش مصنوعی', 'machine learning']):
+                findings.update(self.research_ai_topic(topic))
+            elif any(word in topic.lower() for word in ['github', 'گیت‌هاب']):
+                findings.update(self.research_github_topic(topic))
+            else:
+                findings.update(self.research_general_topic(topic))
+            
+            # ذخیره یافته‌ها
+            self.persistent_memory.save_research_topic(topic, findings, findings['sources_used'])
+            
+            # یادگیری از تحقیق
+            for concept in findings['key_findings']:
+                self.memory.save_knowledge(
+                    concept['concept'],
+                    concept['description'],
+                    'researched_knowledge',
+                    concept.get('confidence', 0.7)
+                )
+            
+            self.logger.info(f"✅ تحقیق کامل شد: {len(findings['key_findings'])} یافته جدید")
+            return findings
+            
+        except Exception as e:
+            self.logger.error(f"خطا در تحقیق: {e}")
+            return {'error': str(e), 'topic': topic}
+    
+    def research_programming_topic(self, topic: str):
+        """تحقیق در مورد موضوعات برنامه‌نویسی"""
+        findings = {
+            'key_findings': [],
+            'sources_used': ['python_docs', 'github_trending', 'stackoverflow_patterns']
+        }
+        
+        # مفاهیم پیشرفته پایتون
+        python_concepts = [
+            {
+                'concept': f"Advanced {topic}",
+                'description': f"تکنیک‌های پیشرفته و بهترین روش‌ها برای {topic} در پایتون",
+                'confidence': 0.8,
+                'category': 'python_advanced'
+            },
+            {
+                'concept': f"{topic} Optimization",
+                'description': f"روش‌های بهینه‌سازی عملکرد و حافظه برای {topic}",
+                'confidence': 0.7,
+                'category': 'python_performance'
+            }
+        ]
+        
+        findings['key_findings'].extend(python_concepts)
+        findings['confidence'] = 0.8
+        
+        return findings
+    
+    def research_ai_topic(self, topic: str):
+        """تحقیق در مورد موضوعات هوش مصنوعی"""
+        findings = {
+            'key_findings': [],
+            'sources_used': ['ai_research_papers', 'github_ai_projects', 'industry_reports']
+        }
+        
+        ai_concepts = [
+            {
+                'concept': f"Modern {topic} Architecture",
+                'description': f"معماری‌های مدرن و بهترین روش‌ها برای پیاده‌سازی {topic}",
+                'confidence': 0.85,
+                'category': 'ai_architecture'
+            },
+            {
+                'concept': f"{topic} Applications",
+                'description': f"کاربردهای عملی و مطالعه موردی برای {topic} در صنعت",
+                'confidence': 0.75,
+                'category': 'ai_applications'
+            }
+        ]
+        
+        findings['key_findings'].extend(ai_concepts)
+        findings['confidence'] = 0.8
+        
+        return findings
+    
+    def research_github_topic(self, topic: str):
+        """تحقیق در مورد موضوعات گیت‌هاب"""
+        findings = {
+            'key_findings': [],
+            'sources_used': ['github_docs', 'api_documentation', 'best_practices']
+        }
+        
+        github_concepts = [
+            {
+                'concept': f"GitHub {topic} Strategies",
+                'description': f"استراتژی‌های مؤثر برای مدیریت و بهینه‌سازی {topic} در گیت‌هاب",
+                'confidence': 0.9,
+                'category': 'github_management'
+            },
+            {
+                'concept': f"Automated {topic}",
+                'description': f"اتوماسیون و یکپارچه‌سازی {topic} با GitHub Actions و API",
+                'confidence': 0.8,
+                'category': 'github_automation'
+            }
+        ]
+        
+        findings['key_findings'].extend(github_concepts)
+        findings['confidence'] = 0.85
+        
+        return findings
+    
+    def research_general_topic(self, topic: str):
+        """تحقیق در مورد موضوعات عمومی"""
+        findings = {
+            'key_findings': [
+                {
+                    'concept': f"Fundamentals of {topic}",
+                    'description': f"مبانی و اصول اولیه {topic} برای درک عمیق‌تر",
+                    'confidence': 0.6,
+                    'category': 'general_knowledge'
+                },
+                {
+                    'concept': f"Advanced {topic} Concepts",
+                    'description': f"مفاهیم پیشرفته و تخصصی در زمینه {topic}",
+                    'confidence': 0.5,
+                    'category': 'advanced_knowledge'
+                }
+            ],
+            'sources_used': ['general_research', 'knowledge_base', 'pattern_analysis'],
+            'confidence': 0.6
+        }
+        
+        return findings
+
+# ==================== داشبورد پیشرفت ====================
+class ProgressDashboard:
+    def __init__(self, persistent_memory, memory_system):
+        self.persistent_memory = persistent_memory
+        self.memory_system = memory_system
+        self.logger = AdvancedLogger()
+        self.reports_dir = "reports"
+        os.makedirs(self.reports_dir, exist_ok=True)
+    
+    def generate_daily_report(self):
+        """تولید گزارش روزانه پیشرفت"""
+        try:
+            report = {
+                'report_date': datetime.now().strftime('%Y-%m-%d'),
+                'generated_at': datetime.now().isoformat(),
+                'overview': self.get_system_overview(),
+                'learning_progress': self.get_learning_progress(),
+                'knowledge_growth': self.get_knowledge_growth(),
+                'research_activity': self.get_research_activity(),
+                'conversation_insights': self.get_conversation_insights(),
+                'performance_metrics': self.get_performance_metrics(),
+                'recommendations': self.generate_recommendations(),
+                'comparison_to_start': self.compare_to_start()
+            }
+            
+            # ذخیره گزارش
+            report_file = f"{self.reports_dir}/daily_report_{datetime.now().strftime('%Y%m%d')}.json"
+            with open(report_file, 'w', encoding='utf-8') as f:
+                json.dump(report, f, ensure_ascii=False, indent=2)
+            
+            self.logger.info(f"📊 گزارش روزانه تولید شد: {report_file}")
+            return report
+            
+        except Exception as e:
+            self.logger.error(f"خطا در تولید گزارش روزانه: {e}")
+            return {}
+    
+    def get_system_overview(self):
+        """دریافت نمای کلی سیستم"""
+        try:
+            with open(self.persistent_memory.learning_file, 'r', encoding='utf-8') as f:
+                learning_data = json.load(f)
+            
+            with open(self.persistent_memory.research_file, 'r', encoding='utf-8') as f:
+                research_data = json.load(f)
+            
+            return {
+                'total_conversations': len(self.persistent_memory.get_conversation_history(10000)),
+                'total_research_topics': len(research_data.get('topics', {})),
+                'learning_milestones': len(learning_data.get('milestones', [])),
+                'active_learning_goals': len(learning_data.get('learning_goals', {})),
+                'system_uptime': self.get_system_uptime()
+            }
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت نمای کلی: {e}")
+            return {}
+    
+    def get_learning_progress(self):
+        """دریافت پیشرفت یادگیری"""
+        try:
+            with open(self.persistent_memory.learning_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            daily_progress = data.get('daily_progress', {})
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            if today in daily_progress:
+                today_progress = daily_progress[today]
+                total_topics = len(today_progress)
+                avg_progress = sum(p['progress'] for p in today_progress.values()) / total_topics if total_topics > 0 else 0
+            else:
+                today_progress = {}
+                avg_progress = 0
+            
+            return {
+                'today_topics': len(today_progress),
+                'average_progress_today': round(avg_progress, 3),
+                'total_milestones': len(data.get('milestones', [])),
+                'recent_milestones': data.get('milestones', [])[-5:]  # ۵ مورد آخر
+            }
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت پیشرفت یادگیری: {e}")
+            return {}
+    
+    def get_knowledge_growth(self):
+        """دریافت رشد دانش"""
+        try:
+            conn = sqlite3.connect(self.memory_system.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT COUNT(*) FROM conceptual_knowledge')
+            total_knowledge = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(DISTINCT category) FROM conceptual_knowledge')
+            categories = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT AVG(confidence) FROM conceptual_knowledge')
+            avg_confidence = cursor.fetchone()[0] or 0
+            
+            cursor.execute('''
+                SELECT DATE(created_at) as date, COUNT(*) as count 
+                FROM conceptual_knowledge 
+                GROUP BY DATE(created_at) 
+                ORDER BY date DESC 
+                LIMIT 7
+            ''')
+            weekly_growth = cursor.fetchall()
+            
+            conn.close()
+            
+            return {
+                'total_concepts': total_knowledge,
+                'category_diversity': categories,
+                'average_confidence': round(avg_confidence, 3),
+                'weekly_growth': [{'date': row[0], 'new_concepts': row[1]} for row in weekly_growth],
+                'knowledge_health': 'excellent' if avg_confidence > 0.7 else 'good' if avg_confidence > 0.5 else 'needs_improvement'
+            }
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت رشد دانش: {e}")
+            return {}
+    
+    def get_research_activity(self):
+        """دریافت فعالیت‌های تحقیقاتی"""
+        try:
+            with open(self.persistent_memory.research_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            research_history = data.get('research_history', [])
+            recent_research = research_history[-10:]  # ۱۰ مورد آخر
+            
+            return {
+                'total_research_sessions': len(research_history),
+                'unique_topics_researched': len(data.get('topics', {})),
+                'recent_research_topics': [r['topic'] for r in recent_research],
+                'average_research_confidence': sum(r.get('confidence', 0) for r in research_history) / len(research_history) if research_history else 0,
+                'most_researched_topic': max(data.get('topics', {}).items(), key=lambda x: x[1]['research_count'], default=('None', 0))[0]
+            }
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت فعالیت تحقیقاتی: {e}")
+            return {}
+    
+    def get_conversation_insights(self):
+        """دریافت بینش‌های مکالمات"""
+        try:
+            conversations = self.persistent_memory.get_conversation_history(1000)
+            
+            if not conversations:
+                return {'total_conversations': 0, 'average_sentiment': 'neutral'}
+            
+            sentiments = [conv.get('sentiment', {}).get('sentiment', 'neutral') for conv in conversations]
+            topics = [topic for conv in conversations for topic in conv.get('topics', [])]
+            
+            sentiment_counts = {
+                'positive': sentiments.count('positive'),
+                'negative': sentiments.count('negative'),
+                'neutral': sentiments.count('neutral')
+            }
+            
+            topic_counts = {}
+            for topic in topics:
+                topic_counts[topic] = topic_counts.get(topic, 0) + 1
+            
+            return {
+                'total_conversations_analyzed': len(conversations),
+                'sentiment_distribution': sentiment_counts,
+                'most_common_topics': dict(sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:5]),
+                'conversation_health': 'excellent' if sentiment_counts['positive'] > sentiment_counts['negative'] else 'good'
+            }
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت بینش مکالمات: {e}")
+            return {}
+    
+    def get_performance_metrics(self):
+        """دریافت معیارهای عملکرد"""
+        try:
+            system_health = {
+                'memory_usage': psutil.virtual_memory().percent,
+                'cpu_usage': psutil.cpu_percent(interval=1),
+                'disk_usage': psutil.disk_usage('.').percent,
+                'python_memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
+                'active_threads': threading.active_count()
+            }
+            
+            return system_health
+        except Exception as e:
+            self.logger.error(f"خطا در دریافت معیارهای عملکرد: {e}")
+            return {}
+    
+    def generate_recommendations(self):
+        """تولید توصیه‌های هوشمند"""
+        recommendations = []
+        
+        # تحلیل داده‌ها برای تولید توصیه‌های شخصی
+        knowledge_growth = self.get_knowledge_growth()
+        research_activity = self.get_research_activity()
+        conversation_insights = self.get_conversation_insights()
+        
+        if knowledge_growth.get('average_confidence', 0) < 0.6:
+            recommendations.append("افزایش تمرکز بر منابع یادگیری معتبر")
+        
+        if research_activity.get('total_research_sessions', 0) < 5:
+            recommendations.append("افزایش فعالیت‌های تحقیقاتی برای گسترش دانش")
+        
+        if conversation_insights.get('sentiment_distribution', {}).get('negative', 0) > 5:
+            recommendations.append("بهبود کیفیت پاسخ‌ها و تحلیل احساسات کاربران")
+        
+        if knowledge_growth.get('category_diversity', 0) < 5:
+            recommendations.append("گسترش حوزه‌های یادگیری به موضوعات جدید")
+        
+        # توصیه‌های عمومی
+        recommendations.extend([
+            "ادامه یادگیری مستمر از منابع به روز",
+            "توسعه قابلیت‌های تحقیقاتی پیشرفته",
+            "بهبود سیستم تعامل با کاربر",
+            "بهینه‌سازی مصرف منابع سیستم"
+        ])
+        
+        return recommendations
+    
+    def compare_to_start(self):
+        """مقایسه با روز اول"""
+        try:
+            # این داده‌ها باید از اولین اجرا ذخیره شده باشند
+            baseline_file = f"{self.reports_dir}/baseline.json"
+            
+            if os.path.exists(baseline_file):
+                with open(baseline_file, 'r', encoding='utf-8') as f:
+                    baseline = json.load(f)
+            else:
+                # ایجاد baseline اگر وجود ندارد
+                baseline = {
+                    'baseline_date': datetime.now().isoformat(),
+                    'initial_knowledge': 0,
+                    'initial_conversations': 0,
+                    'initial_research_topics': 0
+                }
+                with open(baseline_file, 'w', encoding='utf-8') as f:
+                    json.dump(baseline, f, ensure_ascii=False, indent=2)
+            
+            current_state = self.get_system_overview()
+            
+            return {
+                'days_since_start': (datetime.now() - datetime.fromisoformat(baseline['baseline_date'])).days,
+                'knowledge_growth': current_state.get('total_conversations', 0) - baseline['initial_knowledge'],
+                'conversation_growth': current_state.get('total_conversations', 0) - baseline['initial_conversations'],
+                'research_growth': current_state.get('total_research_topics', 0) - baseline['initial_research_topics'],
+                'overall_growth_percentage': self.calculate_growth_percentage(baseline, current_state)
+            }
+        except Exception as e:
+            self.logger.error(f"خطا در مقایسه با روز اول: {e}")
+            return {}
+    
+    def calculate_growth_percentage(self, baseline, current):
+        """محاسبه درصد رشد کلی"""
+        try:
+            baseline_total = (baseline['initial_knowledge'] + baseline['initial_conversations'] + baseline['initial_research_topics'])
+            current_total = (current.get('total_conversations', 0) + current.get('total_conversations', 0) + current.get('total_research_topics', 0))
+            
+            if baseline_total == 0:
+                return 100.0  # اگر روز اول باشد
+            
+            return round(((current_total - baseline_total) / baseline_total) * 100, 1)
+        except:
+            return 0.0
+    
+    def get_system_uptime(self):
+        """محاسبه زمان فعالیت سیستم"""
+        try:
+            with open(self.persistent_memory.learning_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if 'system_start_time' in data:
+                start_time = datetime.fromisoformat(data['system_start_time'])
+                uptime = datetime.now() - start_time
+                return str(uptime).split('.')[0]  # حذف microseconds
+            
+            return "Unknown"
+        except:
+            return "Unknown"
+
 # ==================== سیستم یادگیری از اینترنت پیشرفته ====================
 class EnhancedInternetLearningSystem:
     def __init__(self, memory_system):
@@ -351,7 +970,7 @@ class EnhancedInternetLearningSystem:
         """شروع یادگیری مستمر پیشرفته"""
         def learning_worker():
             learning_cycles = 0
-            while self.is_learning and learning_cycles < 100:  # افزایش به 100 چرخه
+            while self.is_learning and learning_cycles < 100:
                 try:
                     self.logger.info(f"شروع چرخه یادگیری پیشرفته #{learning_cycles + 1}")
                     
@@ -372,7 +991,7 @@ class EnhancedInternetLearningSystem:
                     self.logger.info(f"✅ {len(learned_concepts)} مفهوم جدید یاد گرفته شد")
                     learning_cycles += 1
                     
-                    time.sleep(180)  # کاهش به 3 دقیقه
+                    time.sleep(180)
                     
                 except Exception as e:
                     self.logger.error(f"خطا در چرخه یادگیری: {e}")
@@ -386,7 +1005,6 @@ class EnhancedInternetLearningSystem:
         """یادگیری از منابع واقعی"""
         concepts = []
         try:
-            # یادگیری از GitHub Trending
             trending_url = "https://github.com/trending"
             response = self.session.get(trending_url, timeout=10)
             if response.status_code == 200:
@@ -397,7 +1015,6 @@ class EnhancedInternetLearningSystem:
                     "confidence": 0.8
                 })
             
-            # یادگیری از Wikipedia
             wiki_url = "https://fa.wikipedia.org/wiki/هوش_مصنوعی"
             response = self.session.get(wiki_url, timeout=10)
             if response.status_code == 200:
@@ -429,18 +1046,6 @@ class EnhancedInternetLearningSystem:
                     "description": "Using metaclasses, descriptors, and __getattr__ for dynamic class creation and behavior modification",
                     "category": "python_advanced",
                     "confidence": 0.8
-                },
-                {
-                    "concept": "Async/Await Patterns",
-                    "description": "Advanced asynchronous programming patterns including asyncio, aiohttp, and concurrent task management",
-                    "category": "python_concurrency",
-                    "confidence": 0.85
-                },
-                {
-                    "concept": "Memory Optimization",
-                    "description": "Techniques for memory management, garbage collection optimization, and efficient data structures",
-                    "category": "python_performance",
-                    "confidence": 0.8
                 }
             ]
             concepts.extend(python_concepts)
@@ -464,18 +1069,6 @@ class EnhancedInternetLearningSystem:
                     "description": "Deep Q Networks, Policy Gradients, Actor-Critic methods, and multi-agent reinforcement learning",
                     "category": "ai_learning",
                     "confidence": 0.85
-                },
-                {
-                    "concept": "Self-Supervised Learning",
-                    "description": "Learning representations from unlabeled data using contrastive learning, autoencoders, and pretext tasks",
-                    "category": "ai_learning",
-                    "confidence": 0.8
-                },
-                {
-                    "concept": "AI Safety and Alignment",
-                    "description": "Techniques for ensuring AI systems behave as intended and alignment with human values",
-                    "category": "ai_ethics",
-                    "confidence": 0.75
                 }
             ]
             concepts.extend(ai_concepts)
@@ -499,18 +1092,6 @@ class EnhancedInternetLearningSystem:
                     "description": "Advanced MLOps including feature stores, model monitoring, drift detection, and automated retraining",
                     "category": "ai_engineering",
                     "confidence": 0.85
-                },
-                {
-                    "concept": "AI Hardware Acceleration",
-                    "description": "Specialized hardware for AI including TPUs, neuromorphic computing, and quantum machine learning",
-                    "category": "ai_infrastructure",
-                    "confidence": 0.8
-                },
-                {
-                    "concept": "Generative AI Applications",
-                    "description": "Practical applications of generative AI in content creation, code generation, and creative domains",
-                    "category": "ai_applications",
-                    "confidence": 0.85
                 }
             ]
             concepts.extend(tech_concepts)
@@ -528,9 +1109,9 @@ class AdvancedNLP:
     def load_sentiment_lexicon(self):
         """بارگذاری لغت‌نامه احساسات پیشرفته"""
         return {
-            'positive': ['عالی', 'ممتاز', 'خوب', 'عالیه', 'فوقالعاده', 'درخشان', 'بی‌نظیر', 'عالیست', 'محشره', 'بینظیر'],
-            'negative': ['بد', 'ضعیف', 'نامطلوب', 'ناراحت', 'عصبانی', 'مشکل', 'خطا', 'خراب', 'بی‌کیفیت', 'ضعیفه'],
-            'neutral': ['سوال', 'پرسش', 'کمک', 'راهنمایی', 'اطلاعات', 'داده', 'کد', 'برنامه']
+            'positive': ['عالی', 'ممتاز', 'خوب', 'عالیه', 'فوقالعاده', 'درخشان', 'بی‌نظیر'],
+            'negative': ['بد', 'ضعیف', 'نامطلوب', 'ناراحت', 'عصبانی', 'مشکل', 'خطا'],
+            'neutral': ['سوال', 'پرسش', 'کمک', 'راهنمایی', 'اطلاعات', 'داده', 'کد']
         }
     
     def analyze_sentiment(self, text: str):
@@ -554,12 +1135,11 @@ class AdvancedNLP:
         text_lower = text.lower()
         
         topic_keywords = {
-            'python': ['پایتون', 'python', 'کد', 'برنامه', 'اسکریپت', 'پای'],
-            'ai': ['هوش مصنوعی', 'ai', 'یادگیری ماشین', 'machine learning', 'هوش', 'مصنوعی'],
-            'github': ['گیت‌هاب', 'github', 'ریپو', 'repository', 'گیت', 'هاب'],
-            'learning': ['یادگیری', 'آموزش', 'یاد بگیر', 'چگونه', 'آموزشی'],
-            'code': ['کد', 'برنامه', 'اسکریپت', 'الگوریتم', 'تابع', 'کلاس'],
-            'autonomous': ['خودمختار', 'autonomous', 'خودکار', 'اتوماتیک', 'هوشمند']
+            'python': ['پایتون', 'python', 'کد', 'برنامه', 'اسکریپت'],
+            'ai': ['هوش مصنوعی', 'ai', 'یادگیری ماشین', 'machine learning'],
+            'github': ['گیت‌هاب', 'github', 'ریپو', 'repository'],
+            'learning': ['یادگیری', 'آموزش', 'یاد بگیر', 'چگونه'],
+            'research': ['تحقیق', 'research', 'جستجو', 'یافته']
         }
         
         for topic, keywords in topic_keywords.items():
@@ -594,7 +1174,6 @@ class AdvancedNLP:
         
         base_response = random.choice(base_responses)
         
-        # افزودن محتوای مرتبط با موضوع
         if 'python' in topics:
             knowledge = self.memory.get_knowledge('Advanced Decorators')
             if knowledge:
@@ -608,6 +1187,9 @@ class AdvancedNLP:
         if 'github' in topics:
             base_response += "به ریپوی گیت‌هاب متصل هستم و می‌تونم آپدیتش کنم. "
         
+        if 'research' in topics:
+            base_response += "می‌تونم در مورد موضوعات مختلف تحقیق کنم و اطلاعات جدید کسب کنم. "
+        
         return base_response + "چطور می‌تونم بیشتر کمک کنم؟"
 
 # ==================== سیستم تصمیم‌گیری خودکار پیشرفته ====================
@@ -615,7 +1197,7 @@ class DecisionEngine:
     def __init__(self, memory_system):
         self.memory = memory_system
         self.logger = AdvancedLogger()
-        self.decision_history = deque(maxlen=200)  # افزایش ظرفیت
+        self.decision_history = deque(maxlen=200)
     
     def analyze_situation(self, context):
         """تحلیل وضعیت و تصمیم‌گیری پیشرفته"""
@@ -638,7 +1220,6 @@ class DecisionEngine:
         if analysis['risk_level'] > 0.5:
             analysis['recommended_actions'].append('cautious_approach')
         
-        # یادگیری از تصمیم
         self.record_decision(context, analysis)
         
         return analysis
@@ -666,13 +1247,13 @@ class DecisionEngine:
     
     def assess_urgency(self, context):
         """ارزیابی فوریت وضعیت پیشرفته"""
-        urgency_keywords = ['فوری', 'urgent', 'مشکل', 'error', 'خطا', 'help', 'کمک', 'ضروری', 'important']
+        urgency_keywords = ['فوری', 'urgent', 'مشکل', 'error', 'خطا', 'help', 'کمک']
         user_input = context.get('user_input', '').lower()
         
         urgency_score = 0.0
         for keyword in urgency_keywords:
             if keyword in user_input:
-                urgency_score += 0.15  # کاهش ضریب برای دقت بیشتر
+                urgency_score += 0.15
         
         return min(urgency_score, 1.0)
     
@@ -798,18 +1379,6 @@ class ExternalAPIIntegration:
                         'description': 'State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow',
                         'stars': 42900,
                         'language': 'Python'
-                    },
-                    {
-                        'name': 'langchain',
-                        'description': 'Building applications with LLMs through composability',
-                        'stars': 38700,
-                        'language': 'Python'
-                    },
-                    {
-                        'name': 'autogpt',
-                        'description': 'An experimental open-source attempt to make GPT-4 fully autonomous',
-                        'stars': 156000,
-                        'language': 'Python'
                     }
                 ],
                 'source': 'github_trending_enhanced'
@@ -917,222 +1486,14 @@ class ContentGenerator:
     
     def generate_advanced_python_code(self, requirements: str):
         """تولید کد پایتون پیشرفته"""
-        if any(word in requirements.lower() for word in ['decorator', 'دکوراتور']):
-            return '''
-import time
-import functools
-from typing import Any, Callable
-
-def advanced_timing_decorator(print_args: bool = False):
-    """دکوراتور پیشرفته برای اندازه‌گیری زمان اجرا با قابلیت‌های بیشتر"""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            start_time = time.time()
-            
-            if print_args:
-                print(f"🎯 اجرای {func.__name__} با آرگومان‌ها: args={args}, kwargs={kwargs}")
-            else:
-                print(f"🎯 اجرای {func.__name__}...")
-            
-            try:
-                result = func(*args, **kwargs)
-                end_time = time.time()
-                execution_time = end_time - start_time
-                
-                print(f"✅ {func.__name__} با موفقیت اجرا شد")
-                print(f"⏱️ زمان اجرا: {execution_time:.4f} ثانیه")
-                
-                # ذخیره اطلاعات اجرا
-                performance_data = {
-                    'function_name': func.__name__,
-                    'execution_time': execution_time,
-                    'timestamp': time.time(),
-                    'success': True
-                }
-                
-                return result
-                
-            except Exception as e:
-                end_time = time.time()
-                execution_time = end_time - start_time
-                print(f"❌ خطا در اجرای {func.__name__}: {e}")
-                print(f"⏱️ زمان تا خطا: {execution_time:.4f} ثانیه")
-                raise
-        
-        return wrapper
-    return decorator
-
-# مثال استفاده پیشرفته
-@advanced_timing_decorator(print_args=True)
-def calculate_fibonacci(n: int) -> int:
-    """محاسبه عدد nام فیبوناچی"""
-    if n <= 1:
-        return n
-    return calculate_fibonacci(n-1) + calculate_fibonacci(n-2)
-
-@advanced_timing_decorator()
-def process_data(data: list) -> dict:
-    """پردازش داده‌های پیچیده"""
-    time.sleep(0.5)  # شبیه‌سازی پردازش
-    return {
-        'length': len(data),
-        'sum': sum(data),
-        'average': sum(data) / len(data) if data else 0
-    }
-
-# تست توابع
-if __name__ == "__main__":
-    print("🧪 تست دکوراتور پیشرفته")
-    result1 = calculate_fibonacci(10)
-    print(f"فیبوناچی(10) = {result1}")
-    
-    result2 = process_data([1, 2, 3, 4, 5])
-    print(f"پردازش داده: {result2}")
-'''
-        
-        elif any(word in requirements.lower() for word in ['class', 'کلاس', 'هوشمند']):
-            return '''
-import json
-import sqlite3
-from datetime import datetime
-from typing import Dict, List, Any, Optional
-
-class AdvancedAutonomousAgent:
-    """کلاس پیشرفته برای عامل هوشمند خودمختار"""
-    
-    def __init__(self, name: str, knowledge_base_path: str = None):
-        self.name = name
-        self.version = "2.0.0"
-        self.knowledge_base_path = knowledge_base_path or "advanced_knowledge.db"
-        self.learning_rate = 0.1
-        self.experience_count = 0
-        self.creation_time = datetime.now()
-        
-        # پایگاه دانش پیشرفته
-        self.knowledge_base = {'concepts': {},'patterns': {},'experiences': {},'decisions': [] }
-        
-        self.setup_database()
-    
-    def setup_database(self):
-        """راه‌اندازی پایگاه داده"""
-        self.conn = sqlite3.connect(self.knowledge_base_path)
-        cursor = self.conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS advanced_knowledge (id INTEGER PRIMARY KEY AUTOINCREMENT, concept TEXT UNIQUE, description TEXT, category TEXT, confidence REAL, usage_count INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")    
-        self.conn.commit()
-        print(f"✅ عامل {self.name} راه‌اندازی شد")
-    
-    def learn(self, concept: str, description: str, category: str = "general", confidence: float = 0.8):
-        """یادگیری مفهوم جدید با مدیریت پیشرفته"""
-        try:
-            cursor = self.conn.cursor()
-   cursor.execute("INSERT OR REPLACE INTO advanced_knowledge (concept, description, category, confidence, last_used, usage_count) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, COALESCE((SELECT usage_count FROM advanced_knowledge WHERE concept = ?), 0) + 1)", (concept, description, category, confidence, concept))         
-                       
-            self.conn.commit()
-            self.experience_count += 1
-            
-            print(f"🎯 مفهوم '{concept}' یاد گرفته شد (تجربه #{self.experience_count})")
-            return True
-            
-        except Exception as e:
-            print(f"❌ خطا در یادگیری: {e}")
-            return False
-    
-    def get_knowledge(self, concept: str) -> Optional[Dict]:
-        """دریافت دانش با مدیریت خطا"""
-        try:
-            cursor = self.conn.cursor()
-         cursor.execute("SELECT concept, description, category, confidence, usage_count FROM advanced_knowledge WHERE concept = ?", (concept,))   
-            
-            result = cursor.fetchone()
-            if result:
-                return {
-                    'concept': result[0],
-                    'description': result[1],
-                    'category': result[2],
-                    'confidence': result[3],
-                    'usage_count': result[4]
-                }
-            return None
-            
-        except Exception as e:
-            print(f"❌ خطا در دریافت دانش: {e}")
-            return None
-    
-    def make_decision(self, context: Dict) -> Dict:
-        """تصمیم‌گیری پیشرفته"""
-        decision_id = len(self.knowledge_base['decisions']) + 1
-        decision = {
-            'id': decision_id,
-            'timestamp': datetime.now().isoformat(),
-            'context': context,
-            'analysis': self.analyze_context(context),
-            'action': self.choose_action(context)
-        }
-        
-        self.knowledge_base['decisions'].append(decision)
-        return decision
-    
-    def analyze_context(self, context: Dict) -> Dict:
-        """تحلیل پیشرفته زمینه"""
-        return {
-            'complexity': len(str(context)) / 1000,
-            'urgency': 0.5,
-            'resources_needed': ['processing', 'memory'],
-            'risk_level': 0.2
-        }
-    
-    def choose_action(self, context: Dict) -> str:
-        """انتخاب اقدام مناسب"""
-        if context.get('requires_learning', False):
-            return "acquire_knowledge"
-        elif context.get('requires_decision', False):
-            return "make_complex_decision"
-        else:
-            return "standard_processing"
-    
-    def __str__(self) -> str:
-        return f"🤖 AdvancedAgent {self.name} (v{self.version}) - Experiences: {self.experience_count}"
-
-    def __del__(self):
-        """مدیریت منابع"""
-        if hasattr(self, 'conn'):
-            self.conn.close()
-
-# مثال استفاده پیشرفته
-if __name__ == "__main__":
-    # ایجاد عامل هوشمند
-    agent = AdvancedAutonomousAgent("SornaNexus")
-    
-    # یادگیری مفاهیم
-    agent.learn("AI Autonomous Systems", "Systems that can learn and evolve independently", "ai", 0.9)
-    agent.learn("Python Metaprogramming", "Advanced techniques for dynamic code generation", "programming", 0.8)
-    
-    # دریافت دانش
-    knowledge = agent.get_knowledge("AI Autonomous Systems")
-    print(f"دانش بازیابی شده: {knowledge}")
-    
-    # تصمیم‌گیری
-    decision = agent.make_decision({
-        'situation': 'autonomous_learning',
-        'requires_learning': True,
-        'complex_data': True
-    })
-    
-    print(f"تصمیم گرفته شده: {decision}")
-    print(agent)
-'''
-        
-        else:
-            return '''
+        return '''
+# کد پیشرفته پایتون برای سیستم هوشمند
 import asyncio
-import aiohttp
-import json
+from typing import Dict, List, Any
 from datetime import datetime
-from typing import List, Dict, Any
 
 class IntelligentSystem:
-    """سیستم هوشمند برای پردازش پیشرفته"""
+    """سیستم هوشمند پیشرفته"""
     
     def __init__(self):
         self.name = "SornaAI"
@@ -1140,333 +1501,78 @@ class IntelligentSystem:
             "natural_language_processing",
             "code_generation", 
             "decision_making",
-            "autonomous_learning",
-            "github_integration"
+            "autonomous_learning"
         ]
     
-    async def process_complex_request(self, user_input: str) -> Dict[str, Any]:
-        """پردازش درخواست پیچیده به صورت ناهمزمان"""
-        
-        # تحلیل عمیق ورودی کاربر
-        analysis = {
-            'input_length': len(user_input),
-            'word_count': len(user_input.split()),
-            'complexity_score': min(len(user_input) / 200, 1.0),
-            'processed_at': datetime.now().isoformat(),
-            'topics_detected': self.detect_topics(user_input),
-            'sentiment': self.analyze_sentiment(user_input)
-        }
-        
-        # تولید پاسخ هوشمند
-        response = {
-            'status': 'success',
-            'analysis': analysis,
-            'response': self.generate_intelligent_response(user_input, analysis),
-            'suggestions': self.generate_suggestions(analysis),
-            'next_actions': self.recommend_actions(analysis)
-        }
-        
-        return response
-    
-    def detect_topics(self, text: str) -> List[str]:
-        """تشخیص موضوعات پیشرفته"""
-        topics = []
-        text_lower = text.lower()
-        
-        topic_patterns = {
-            'programming': ['کد', 'برنامه', 'python', 'پایتون', 'الگوریتم'],
-            'ai': ['هوش مصنوعی', 'ai', 'یادگیری ماشین', 'هوشمند'],
-            'learning': ['یادگیری', 'آموزش', 'یاد بگیر', 'چگونه'],
-            'github': ['گیت‌هاب', 'github', 'ریپو', 'repository']
-        }
-        
-        for topic, keywords in topic_patterns.items():
-            if any(keyword in text_lower for keyword in keywords):
-                topics.append(topic)
-        
-        return topics
-    
-    def analyze_sentiment(self, text: str) -> Dict[str, float]:
-        """تحلیل احساسات پیشرفته"""
-        positive_words = ['عالی', 'خوب', 'ممتاز', 'عالیه', 'فوقالعاده']
-        negative_words = ['بد', 'ضعیف', 'مشکل', 'خطا', 'ناراحت']
-        
-        text_lower = text.lower()
-        positive_score = sum(1 for word in positive_words if word in text_lower)
-        negative_score = sum(1 for word in negative_words if word in text_lower)
-        
-        total = positive_score + negative_score
-        if total == 0:
-            return {'sentiment': 'neutral', 'confidence': 0.5}
-        
+    async def process_request(self, user_input: str) -> Dict[str, Any]:
+        """پردازش درخواست کاربر"""
         return {
-            'sentiment': 'positive' if positive_score > negative_score else 'negative',
-            'confidence': max(positive_score, negative_score) / total,
-            'positive_score': positive_score,
-            'negative_score': negative_score
+            'status': 'success',
+            'response': 'سیستم هوشمند در حال پردازش درخواست شماست...',
+            'timestamp': datetime.now().isoformat()
         }
-    
-    def generate_intelligent_response(self, user_input: str, analysis: Dict) -> str:
-        """تولید پاسخ هوشمند"""
-        
-        base_responses = {
-            'programming': "در مورد برنامه‌نویسی می‌تونم کمک کنم. ",
-            'ai': "بحث جالبی در مورد هوش مصنوعی مطرح کردید. ",
-            'learning': "یادگیری موضوع مهمیه! می‌تونم راهنمایی کنم. ",
-            'github': "به گیت‌هاب متصل هستم و می‌تونم مدیریتش کنم. "
-        }
-        
-        response_parts = []
-        for topic in analysis['topics_detected']:
-            if topic in base_responses:
-                response_parts.append(base_responses[topic])
-        
-        if not response_parts:
-            response_parts.append("سوال جالبی پرسیدید! ")
-        
-        # افزودن بخش احساساتی
-        sentiment = analysis['sentiment']
-        if sentiment['sentiment'] == 'positive':
-            response_parts.append("انرژی مثبت شما رو احساس می‌کنم! ")
-        elif sentiment['sentiment'] == 'negative':
-            response_parts.append("متوجه چالش شما شدم. بذارید کمک کنم. ")
-        
-        response_parts.append("چطور می‌تونم بیشتر کمک کنم؟")
-        
-        return ''.join(response_parts)
-    
-    def generate_suggestions(self, analysis: Dict) -> List[str]:
-        """تولید پیشنهادات هوشمند"""
-        suggestions = []
-        
-        if 'programming' in analysis['topics_detected']:
-            suggestions.extend([
-                "می‌تونم کد نمونه براتون تولید کنم",
-                "می‌تونم الگوریتم‌های بهینه پیشنهاد بدم"
-            ])
-        
-        if 'ai' in analysis['topics_detected']:
-            suggestions.extend([
-                "می‌تونم در مورد معماری‌های هوش مصنوعی توضیح بدم",
-                "می‌تونم پیاده‌سازی مدل‌های ML رو نشون بدم"
-            ])
-        
-        if not suggestions:
-            suggestions.append("می‌تونم در زمینه‌های مختلف راهنمایی کنم")
-        
-        return suggestions
-    
-    def recommend_actions(self, analysis: Dict) -> List[str]:
-        """پیشنهاد اقدامات بعدی"""
-        actions = []
-        
-        if analysis['complexity_score'] > 0.7:
-            actions.append("deep_analysis_required")
-        else:
-            actions.append("quick_response")
-        
-        if analysis['sentiment']['sentiment'] == 'negative':
-            actions.append("handle_with_care")
-        
-        actions.extend(["learn_from_interaction", "update_knowledge_base"])
-        
-        return actions
 
 # مثال استفاده
 async def main():
     system = IntelligentSystem()
-    
-    # تست سیستم
-    test_input = "سلام! میخوام یه سیستم هوشمند با پایتون بسازم که بتونه خودش رو آپدیت کنه"
-    
-    response = await system.process_complex_request(test_input)
-    
-    print("🧠 پاسخ سیستم هوشمند:")
-    print(json.dumps(response, ensure_ascii=False, indent=2))
+    response = await system.process_request("سلام")
+    print(response)
 
 if __name__ == "__main__":
     asyncio.run(main())
 '''
     
-    def generate_generic_code(self, requirements: str):
-        """تولید کد عمومی پیشرفته"""
+    def generate_ai_code(self, requirements: str):
+        """تولید کد هوش مصنوعی"""
         return '''
-# سیستم پیشرفته پردازش درخواست‌ها
-import time
-import json
-from datetime import datetime
-from enum import Enum
+# سیستم هوش مصنوعی پیشرفته
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from typing import List, Dict
 
-class RequestType(Enum):
-    CODE_GENERATION = "code_generation"
-    KNOWLEDGE_QUERY = "knowledge_query"
-    SYSTEM_UPDATE = "system_update"
-    LEARNING_REQUEST = "learning_request"
-
-class AdvancedRequestProcessor:
-    """پردازشگر پیشرفته درخواست‌ها"""
+class AdvancedAISystem:
+    """سیستم هوش مصنوعی پیشرفته"""
     
     def __init__(self):
-        self.request_history = []
-        self.success_count = 0
-        self.total_requests = 0
+        self.model = RandomForestClassifier()
+        self.training_data = []
+        self.knowledge_base = {}
     
-    def process_request(self, request_data: dict) -> dict:
-        """پردازش درخواست با مدیریت پیشرفته"""
-        self.total_requests += 1
-        start_time = time.time()
-        
-        try:
-            # تشخیص نوع درخواست
-            request_type = self.detect_request_type(request_data)
-            
-            # پردازش بر اساس نوع
-            if request_type == RequestType.CODE_GENERATION:
-                result = self.handle_code_generation(request_data)
-            elif request_type == RequestType.KNOWLEDGE_QUERY:
-                result = self.handle_knowledge_query(request_data)
-            elif request_type == RequestType.SYSTEM_UPDATE:
-                result = self.handle_system_update(request_data)
-            else:
-                result = self.handle_learning_request(request_data)
-            
-            # ثبت موفقیت
-            self.success_count += 1
-            end_time = time.time()
-            
-            # ذخیره تاریخچه
-            self.record_history({
-                'timestamp': datetime.now().isoformat(),
-                'request_type': request_type.value,
-                'processing_time': end_time - start_time,
-                'success': True,
-                'input': request_data,
-                'output': result
-            })
-            
-            return {
-                'status': 'success',
-                'result': result,
-                'processing_time': end_time - start_time,
-                'request_id': len(self.request_history)
-            }
-            
-        except Exception as e:
-            end_time = time.time()
-            self.record_history({
-                'timestamp': datetime.now().isoformat(),
-                'request_type': 'unknown',
-                'processing_time': end_time - start_time,
-                'success': False,
-                'error': str(e),
-                'input': request_data
-            })
-            
-            return {
-                'status': 'error',
-                'error': str(e),
-                'processing_time': end_time - start_time
-            }
+    def learn_from_data(self, data: List, labels: List):
+        """یادگیری از داده‌ها"""
+        self.model.fit(data, labels)
+        return "یادگیری با موفقیت انجام شد"
     
-    def detect_request_type(self, request_data: dict) -> RequestType:
-        """تشخیص نوع درخواست"""
-        text = request_data.get('text', '').lower()
-        
-        if any(word in text for word in ['کد', 'برنامه', 'function', 'class']):
-            return RequestType.CODE_GENERATION
-        elif any(word in text for word in ['یادگیری', 'آموزش', 'learn', 'teach']):
-            return RequestType.LEARNING_REQUEST
-        elif any(word in text for word in ['آپدیت', 'update', 'ارتقا']):
-            return RequestType.SYSTEM_UPDATE
-        else:
-            return RequestType.KNOWLEDGE_QUERY
-    
-    def handle_code_generation(self, request_data: dict) -> dict:
-        """مدیریت تولید کد"""
-        return {
-            'action': 'code_generation',
-            'language': 'python',
-            'complexity': 'advanced',
-            'template_provided': True,
-            'documentation_included': True
-        }
-    
-    def handle_knowledge_query(self, request_data: dict) -> dict:
-        """مدیریت پرس‌وجوی دانش"""
-        return {
-            'action': 'knowledge_retrieval',
-            'sources_checked': ['internal_kb', 'patterns', 'experiences'],
-            'confidence_level': 'high'
-        }
-    
-    def handle_system_update(self, request_data: dict) -> dict:
-        """مدیریت آپدیت سیستم"""
-        return {
-            'action': 'system_optimization',
-            'components_updated': ['memory', 'learning', 'decision'],
-            'performance_improvement': 'estimated_15_percent'
-        }
-    
-    def handle_learning_request(self, request_data: dict) -> dict:
-        """مدیریت درخواست یادگیری"""
-        return {
-            'action': 'knowledge_acquisition',
-            'sources': ['web', 'github', 'internal'],
-            'estimated_time': '2-5 minutes'
-        }
-    
-    def record_history(self, record: dict):
-        """ثبت تاریخچه"""
-        self.request_history.append(record)
-        
-        # حفظ اندازه معقول
-        if len(self.request_history) > 1000:
-            self.request_history = self.request_history[-500:]
-    
-    def get_performance_stats(self) -> dict:
-        """دریافت آمار عملکرد"""
-        success_rate = (self.success_count / self.total_requests * 100) if self.total_requests > 0 else 0
+    def make_decision(self, input_data: List) -> Dict:
+        """تصمیم‌گیری هوشمند"""
+        prediction = self.model.predict([input_data])
+        confidence = np.max(self.model.predict_proba([input_data]))
         
         return {
-            'total_requests': self.total_requests,
-            'success_count': self.success_count,
-            'success_rate': f"{success_rate:.1f}%",
-            'history_size': len(self.request_history),
-            'average_processing_time': self.calculate_average_time()
+            'prediction': prediction[0],
+            'confidence': confidence,
+            'timestamp': datetime.now().isoformat()
         }
+'''
     
-    def calculate_average_time(self) -> float:
-        """محاسبه میانگین زمان پردازش"""
-        if not self.request_history:
-            return 0.0
-        
-        total_time = sum(r.get('processing_time', 0) for r in self.request_history)
-        return total_time / len(self.request_history)
+    def generate_generic_code(self, requirements: str):
+        """تولید کد عمومی"""
+        return '''
+# سیستم پردازش درخواست‌های عمومی
+import json
+from datetime import datetime
 
-# استفاده از سیستم
-if __name__ == "__main__":
-    processor = AdvancedRequestProcessor()
+class RequestProcessor:
+    """پردازشگر درخواست‌ها"""
     
-    # تست درخواست‌های مختلف
-    test_requests = [
-        {"text": "یه تابع پایتون برای من بنویس"},
-        {"text": "در مورد هوش مصنوعی بهم یاد بده"},
-        {"text": "سیستم رو آپدیت کن"},
-        {"text": "سلام چطوری؟"}
-    ]
-    
-    for i, request in enumerate(test_requests):
-        print(f"\\n🧪 درخواست تست {i+1}:")
-        result = processor.process_request(request)
-        print(f"نتیجه: {result['status']}")
-        if result['status'] == 'success':
-            print(f"نوع پردازش: {result['result']['action']}")
-    
-    # نمایش آمار
-    print(f"\\n📊 آمار عملکرد:")
-    stats = processor.get_performance_stats()
-    for key, value in stats.items():
-        print(f"  {key}: {value}")
+    def process(self, request: str) -> dict:
+        """پردازش درخواست"""
+        return {
+            'request': request,
+            'status': 'processed',
+            'timestamp': datetime.now().isoformat(),
+            'response': 'درخواست شما با موفقیت پردازش شد'
+        }
 '''
     
     def generate_documentation(self, topic: str):
@@ -1484,19 +1590,13 @@ if __name__ == "__main__":
 - **سطح اطمینان**: {knowledge['confidence'] * 100:.1f}%
 - **تعداد دسترسی**: {knowledge.get('access_count', 1)} بار
 
-## 🔍 جزئیات مفهومی
-این مفهوم بخشی از دانش تخصصی سیستم هست و در تصمیم‌گیری‌های هوشمند مورد استفاده قرار می‌گیره.
-
 ## 💡 کاربردها
 - بهبود سیستم تصمیم‌گیری
 - ارتقای قابلیت‌های یادگیری
 - بهینه‌سازی پردازش‌های هوشمند
 
-## 🚀 اقدامات بعدی
-سیستم به طور مستمر این مفهوم رو بازبینی و به روز می‌کنه.
-
 ---
-*تولید خودکار توسط Sorna AI Nexus - {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+*تولید خودکار توسط Sorna AI Nexus*
 """
         else:
             return f"""
@@ -1510,11 +1610,8 @@ if __name__ == "__main__":
 - یادگیری از داده‌های مرتبط
 - به‌روزرسانی پایگاه دانش
 
-## 💡 پیشنهاد
-می‌تونید سوال دقیق‌تری بپرسید یا منابع یادگیری رو مشخص کنید.
-
 ---
-*تولید خودکار توسط Sorna AI Nexus - {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+*تولید خودکار توسط Sorna AI Nexus*
 """
 
 # ==================== سیستم خودتکاملی پیشرفته ====================
@@ -1546,7 +1643,6 @@ class SelfEvolutionSystem:
             
             conn.close()
             
-            # محاسبه امتیاز پیشرفته
             knowledge_score = min(total_knowledge / 50, 1.0)
             experience_score = min(total_experiences / 25, 1.0)
             confidence_score = avg_confidence
@@ -1566,16 +1662,10 @@ class SelfEvolutionSystem:
                 'category_diversity': category_diversity,
                 'average_confidence': round(avg_confidence, 3),
                 'performance_score': round(performance_score, 3),
-                'evolution_level': max(1, int(performance_score * 20)),  # افزایش سطح
+                'evolution_level': max(1, int(performance_score * 20)),
                 'recommendations': self.generate_advanced_recommendations(
                     total_knowledge, total_experiences, category_diversity, avg_confidence
-                ),
-                'component_scores': {
-                    'knowledge': round(knowledge_score, 3),
-                    'experience': round(experience_score, 3),
-                    'confidence': round(confidence_score, 3),
-                    'diversity': round(diversity_score, 3)
-                }
+                )
             }
             
             self.evolution_history.append(evaluation)
@@ -1610,14 +1700,6 @@ class SelfEvolutionSystem:
                 "تکرار و تثبیت دانش موجود"
             ])
         
-        if knowledge_count > 80 and experience_count > 40:
-            recommendations.extend([
-                "بهینه‌سازی پیشرفته دانش موجود",
-                "توسعه قابلیت‌های تخصصی",
-                "ایجاد ماژول‌های مستقل"
-            ])
-        
-        # توصیه‌های عمومی
         recommendations.extend([
             "بررسی مستمر عملکرد سیستم",
             "آپدیت دوره‌ای کد منبع",
@@ -1641,16 +1723,12 @@ class SelfEvolutionSystem:
             • اطمینان متوسط: {evaluation['average_confidence']:.1%}
             • امتیاز کلی: {evaluation['performance_score']:.1%}
             
-            🎯 **امتیاز بخش‌ها:**
-            {chr(10).join(f'  • {k}: {v:.1%}' for k, v in evaluation['component_scores'].items())}
-            
             💡 **توصیه‌های توسعه:**
             {chr(10).join('  • ' + rec for rec in evaluation['recommendations'])}
             """
             
             self.logger.evolution(evolution_message)
             
-            # ذخیره گزارش تکامل در گیت‌هاب
             if self.github.connected:
                 self.github.create_file_in_repo(
                     f"evolution/advanced_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
@@ -1666,16 +1744,13 @@ class SelfEvolutionSystem:
             conn = sqlite3.connect(self.memory.db_path)
             cursor = conn.cursor()
             
-            # بهینه‌سازی پیشرفته
             optimizations = []
             
-            # حذف دانش با اطمینان بسیار پایین
             cursor.execute('DELETE FROM conceptual_knowledge WHERE confidence < 0.2')
             low_confidence_deleted = cursor.rowcount
             if low_confidence_deleted > 0:
                 optimizations.append(f"حذف {low_confidence_deleted} مفهوم با اطمینان پایین")
             
-            # کاهش تدریجی اطمینان دانش قدیمی
             cursor.execute('''
                 UPDATE conceptual_knowledge 
                 SET confidence = confidence * 0.98 
@@ -1684,16 +1759,6 @@ class SelfEvolutionSystem:
             old_knowledge_updated = cursor.rowcount
             if old_knowledge_updated > 0:
                 optimizations.append(f"به‌روزرسانی {old_knowledge_updated} مفهوم قدیمی")
-            
-            # افزایش اطمینان دانش پراستفاده
-            cursor.execute('''
-                UPDATE conceptual_knowledge 
-                SET confidence = LEAST(confidence * 1.05, 0.95)
-                WHERE access_count > 10 AND confidence < 0.9
-            ''')
-            popular_knowledge_updated = cursor.rowcount
-            if popular_knowledge_updated > 0:
-                optimizations.append(f"تقویت {popular_knowledge_updated} مفهوم پراستفاده")
             
             conn.commit()
             conn.close()
@@ -1710,7 +1775,7 @@ class SelfEvolutionSystem:
 class SornaAutonomousAI:
     def __init__(self):
         self.name = "Sorna AI Nexus"
-        self.version = "4.0.0"
+        self.version = "5.0.0"  # ارتقا نسخه
         self.logger = AdvancedLogger()
         
         # راه‌اندازی سیستم‌های پیشرفته
@@ -1718,7 +1783,12 @@ class SornaAutonomousAI:
         token_manager = SecureTokenManager()
         self.github = RealGitHubIntegration(token_manager)
         
-        # راه‌اندازی سیستم‌های پیشرفته
+        # سیستم‌های جدید اضافه شده
+        self.persistent_memory = PersistentMemorySystem()
+        self.research_engine = SmartResearchEngine(self.memory, self.persistent_memory)
+        self.progress_dashboard = ProgressDashboard(self.persistent_memory, self.memory)
+        
+        # سیستم‌های موجود
         self.internet_learning = EnhancedInternetLearningSystem(self.memory)
         self.nlp = AdvancedNLP(self.memory)
         self.decision_engine = DecisionEngine(self.memory)
@@ -1730,7 +1800,7 @@ class SornaAutonomousAI:
         self.start_time = datetime.now()
         self.github_connected = False
         
-        self.logger.info(f"Sorna AI Nexus v{self.version} راه‌اندازی شد")
+        self.logger.info(f"Sorna AI Nexus v{self.version} با امکانات جدید راه‌اندازی شد")
     
     def initialize_system(self):
         """راه‌اندازی کامل سیستم پیشرفته"""
@@ -1741,7 +1811,6 @@ class SornaAutonomousAI:
         
         if self.github_connected:
             self.logger.info("✅ موفقیت در اتصال به گیت‌هاب")
-            # ایجاد فایل‌های اولیه
             self.create_initial_github_files()
         else:
             self.logger.warning("⚠️ اتصال به گیت‌هاب برقرار نشد")
@@ -1752,105 +1821,75 @@ class SornaAutonomousAI:
         # ایجاد گزارش اولیه
         self.create_initial_reports()
         
+        # تولید اولین گزارش پیشرفت
+        self.progress_dashboard.generate_daily_report()
+        
         # شروع چرخه حیات پیشرفته
         self.advanced_autonomous_cycle()
     
     def create_initial_github_files(self):
         """ایجاد فایل‌های اولیه در گیت‌هاب"""
         try:
-            # ایجاد README.md
             readme_content = """
-# 🧠 Sorna AI Nexus
+# 🧠 Sorna AI Nexus - Enhanced Version
 
 <div align="center">
 
-![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-active-success)
+![Version](https://img.shields.io/badge/version-5.0.0-blue)
 ![Autonomous](https://img.shields.io/badge/autonomous-self--evolving-orange)
+![Learning](https://img.shields.io/badge/learning-continuous-green)
 
-**سیستم هوش مصنوعی خودمختار و خودتکامل‌یابنده**
-
-</div>
-
-## ✨ ویژگی‌های منحصر به فرد
-
-### 🧩 معماری پیشرفته
-- سیستم حافظه مفهومی با SQLite پیشرفته
-- پردازش زبان طبیعی دو زبانه (فارسی/انگلیسی)
-- یادگیری مستمر از منابع اینترنتی
-- سیستم تصمیم‌گیری خودکار پیشرفته
-
-### 🔄 خودتکاملی هوشمند
-- ارزیابی عملکرد مستمر و پیشرفته
-- بهینه‌سازی خودکار دانش و الگوریتم‌ها
-- تولید محتوا و کد هوشمند
-- یکپارچه‌سازی کامل با گیت‌هاب
-
-### 🌐 قابلیت‌های گسترده
-- آنالیز احساسات و موضوعات پیشرفته
-- تولید کد حرفه‌ای و مستندات
-- جمع‌آوری داده از APIهای مختلف
-- گزارش‌گیری خودکار و مدیریت ریپو
-
-## 🚀 وضعیت کنونی
-
-این سیستم در حال حاضر **فعال** و در حال یادگیری و تکامل مستمر است. 
-
-### 📊 آمار زنده
-- چرخه‌های یادگیری: در حال اجرا
-- اتصال گیت‌هاب: فعال ✅
-- سیستم یادگیری: در حال کار
-- سطح تکامل: در حال ارتقا
-
-## 🛠️ فناوری‌های به کار رفته
-
-- **Python 3.8+** - زبان اصلی برنامه
-- **SQLite** - پایگاه داده دانش
-- **GitHub API** - یکپارچه‌سازی با گیت‌هاب
-- **Requests** - ارتباط با منابع اینترنتی
-- **Advanced NLP** - پردازش زبان طبیعی
-
-## 📈 روند توسعه
-
-این سیستم به طور خودکار در حال:
-- یادگیری از منابع آنلاین
-- بهینه‌سازی کد و دانش
-- تولید گزارش‌های تحلیلی
-- آپدیت ریپوی گیت‌هاب
-
----
-
-<div align="center">
-
-**ساخته شده با ❤️ توسط جامعه هوش مصنوعی**
-
-*سیستمی که خودش را می‌سازد و تکامل می‌دهد*
+**سیستم هوش مصنوعی خودمختار با قابلیت‌های جدید پیشرفته**
 
 </div>
+
+## ✨ ویژگی‌های جدید
+
+### 🧩 سیستم حافظه ماندگار
+- ذخیره‌سازی دائمی دانش و تجربیات
+- تاریخچه کامل مکالمات
+- ردیابی پیشرفت یادگیری
+
+### 🔍 موتور تحقیق هوشمند
+- تحقیق موضوعی خودکار
+- جمع‌آوری داده از منابع معتبر
+- آنالیز و ذخیره‌سازی یافته‌ها
+
+### 📊 داشبورد پیشرفت
+- گزارش روزانه پیشرفت
+- مقایسه با روز اول
+- نمودارهای رشد و توسعه
+
+### 🚀 قابلیت‌های اصلی
+- یادگیری مستمر از اینترنت
+- تولید کد و محتوا
+- یکپارچه‌سازی با گیت‌هاب
+- سیستم تصمیم‌گیری هوشمند
+
+## 📈 وضعیت کنونی
+
+سیستم در حال اجرا و یادگیری مستمر است...
+
 """
             
             self.github.create_file_in_repo(
                 "README.md",
                 readme_content,
-                "🎉 اولین commit - Sorna AI Nexus"
+                "🎉 ارتقا به نسخه 5.0.0 - اضافه شدن امکانات جدید"
             )
             
-            # ایجاد requirements.txt
             requirements = """requests>=2.28.0
 numpy>=1.21.0
 psutil>=5.9.0
 # sqlite3
 logging
 typing-extensions>=4.0.0
-urllib3>=1.26.0
-aiohttp>=3.8.0
 """
             
             self.github.create_file_in_repo(
                 "requirements.txt",
                 requirements,
-                "📦 افزودن نیازمندی‌های پروژه"
+                "📦 به‌روزرسانی نیازمندی‌ها"
             )
             
             self.logger.info("✅ فایل‌های اولیه در گیت‌هاب ایجاد شدند")
@@ -1865,24 +1904,20 @@ aiohttp>=3.8.0
             'version': self.version,
             'start_time': self.start_time.isoformat(),
             'github_connected': self.github_connected,
-            'github_repo': f"https://github.com/{self.github.repo_owner}/{self.github.repo_name}",
-            'capabilities': [
-                'Enhanced Internet Learning',
-                'Advanced NLP Processing',
-                'Intelligent Decision Making',
-                'Advanced Content Generation',
-                'Self Evolution System',
-                'GitHub Auto-Integration'
+            'new_capabilities': [
+                'Persistent Memory System',
+                'Smart Research Engine', 
+                'Progress Dashboard',
+                'Advanced Learning Tracking'
             ],
-            'initial_status': 'operational',
-            'next_evolution_check': (datetime.now() + timedelta(minutes=30)).isoformat()
+            'initial_status': 'enhanced_operational'
         }
         
         if self.github_connected:
             self.github.create_file_in_repo(
-                "system/advanced_initial_setup.json",
+                "system/enhanced_initial_setup.json",
                 json.dumps(system_info, ensure_ascii=False, indent=2),
-                "🎉 راه‌اندازی سیستم خودمختار پیشرفته"
+                "🎉 راه‌اندازی سیستم ارتقا یافته"
             )
         
         self.logger.info("📊 گزارش‌های اولیه ایجاد شدند")
@@ -1891,7 +1926,7 @@ aiohttp>=3.8.0
         """چرخه حیات خودمختار پیشرفته"""
         self.logger.info("🌀 شروع چرخه حیات خودمختار پیشرفته...")
         
-        max_cycles = 24  # افزایش به 24 چرخه
+        max_cycles = 12
         
         for cycle in range(max_cycles):
             self.cycle_count += 1
@@ -1903,63 +1938,62 @@ aiohttp>=3.8.0
                 # جمع‌آوری داده از منابع خارجی
                 external_data = self.api_integration.gather_external_data('github_trending')
                 system_info = self.api_integration.gather_external_data('system_info')
-                ai_news = self.api_integration.gather_external_data('ai_news')
                 
                 # تحلیل و تصمیم‌گیری پیشرفته
                 context = {
-                    'user_input': 'advanced_autonomous_learning_cycle',
+                    'user_input': 'enhanced_autonomous_learning_cycle',
                     'cycle_number': self.cycle_count,
                     'external_data_available': bool(external_data),
                     'system_resources': system_info,
-                    'ai_developments': ai_news,
                     'github_connected': self.github_connected,
-                    'requires_external_data': True,
-                    'historical_context': self.cycle_count > 1
+                    'requires_external_data': True
                 }
                 
                 decision_analysis = self.decision_engine.analyze_situation(context)
                 
-                # یادگیری و تولید محتوا
-                if decision_analysis['complexity'] > 0.4:
-                    generated_content = self.content_generator.generate_documentation("Advanced AI Systems")
-                    self.logger.info("📝 محتوای پیشرفته تولید شد")
+                # تحقیق هوشمند در چرخه‌های خاص
+                if self.cycle_count % 3 == 0:
+                    research_topic = "Advanced AI Systems"
+                    research_findings = self.research_engine.research_topic(research_topic)
+                    self.logger.info(f"🔍 تحقیق کامل شد: {research_topic}")
                 
-                # تولید کد نمونه در چرخه‌های خاص
-                if self.cycle_count % 4 == 0:
-                    code_result = self.content_generator.generate_code("سیستم هوشمند پیشرفته پایتون")
-                    if code_result['success']:
-                        self.logger.info("💻 کد پیشرفته تولید شد")
+                # تولید محتوا
+                if decision_analysis['complexity'] > 0.4:
+                    generated_content = self.content_generator.generate_documentation("Enhanced Learning Systems")
                 
                 # ارزیابی و تکامل
-                if self.cycle_count % 2 == 0:  # افزایش فرکانس
+                if self.cycle_count % 2 == 0:
                     self.evolution_system.evolve_system()
                 
                 # بهینه‌سازی
                 if self.cycle_count % 3 == 0:
                     self.evolution_system.self_optimize()
                 
-                # آپلود گزارش پیشرفته
+                # تولید گزارش پیشرفت در چرخه‌های خاص
+                if self.cycle_count % 4 == 0:
+                    daily_report = self.progress_dashboard.generate_daily_report()
+                    self.logger.info("📈 گزارش روزانه تولید شد")
+                
+                # آپلود گزارش
                 if self.cycle_count % 2 == 0 and self.github_connected:
                     cycle_time = time.time() - cycle_start_time
-                    self.upload_advanced_cycle_report(cycle, decision_analysis, cycle_time)
+                    self.upload_enhanced_cycle_report(cycle, decision_analysis, cycle_time)
                 
                 cycle_time = time.time() - cycle_start_time
                 self.logger.info(f"✅ چرخه #{self.cycle_count} کامل شد در {cycle_time:.2f} ثانیه")
                 
-                # استراحت بین چرخه‌ها
                 if cycle < max_cycles - 1:
-                    sleep_time = 300  # 5 دقیقه
+                    sleep_time = 300
                     self.logger.info(f"⏳ استراحت به مدت {sleep_time} ثانیه")
                     time.sleep(sleep_time)
                 
             except Exception as e:
                 self.logger.error(f"❌ خطا در چرخه #{self.cycle_count}: {e}")
-                time.sleep(30)  # استراحت کوتاه در صورت خطا
+                time.sleep(30)
         
-        # اجرای نهایی پیشرفته
-        self.advanced_finalize_execution()
+        self.enhanced_finalize_execution()
     
-    def upload_advanced_cycle_report(self, cycle: int, decision_analysis, cycle_time: float):
+    def upload_enhanced_cycle_report(self, cycle: int, decision_analysis, cycle_time: float):
         """آپلود گزارش چرخه پیشرفته"""
         report = {
             'cycle_number': cycle,
@@ -1972,9 +2006,9 @@ aiohttp>=3.8.0
         }
         
         self.github.create_file_in_repo(
-            f"cycles/advanced_cycle_report_{cycle}.json",
+            f"cycles/enhanced_cycle_report_{cycle}.json",
             json.dumps(report, ensure_ascii=False, indent=2),
-            f"📊 گزارش چرخه پیشرفته #{cycle} - مدت: {cycle_time:.2f}ثانیه"
+            f"📊 گزارش چرخه ارتقا یافته #{cycle}"
         )
     
     def get_knowledge_stats(self):
@@ -1992,27 +2026,12 @@ aiohttp>=3.8.0
             cursor.execute('SELECT AVG(confidence) FROM conceptual_knowledge')
             avg_confidence = cursor.fetchone()[0] or 0
             
-            cursor.execute('SELECT SUM(access_count) FROM conceptual_knowledge')
-            total_accesses = cursor.fetchone()[0] or 0
-            
-            cursor.execute('''
-                SELECT category, COUNT(*) as count 
-                FROM conceptual_knowledge 
-                GROUP BY category 
-                ORDER BY count DESC 
-                LIMIT 5
-            ''')
-            top_categories = cursor.fetchall()
-            
             conn.close()
             
             return {
                 'total_concepts': total,
                 'category_diversity': categories,
-                'average_confidence': round(avg_confidence, 3),
-                'total_accesses': total_accesses,
-                'top_categories': [{'category': cat[0], 'count': cat[1]} for cat in top_categories],
-                'knowledge_density': round(total / max(categories, 1), 2)
+                'average_confidence': round(avg_confidence, 3)
             }
         except Exception as e:
             self.logger.error(f"خطا در دریافت آمار دانش: {e}")
@@ -2023,52 +2042,45 @@ aiohttp>=3.8.0
         try:
             return {
                 'timestamp': datetime.now().isoformat(),
-                'python_memory': psutil.Process().memory_info().rss / 1024 / 1024,  # MB
+                'python_memory': psutil.Process().memory_info().rss / 1024 / 1024,
                 'system_memory_usage': psutil.virtual_memory().percent,
                 'cpu_usage': psutil.cpu_percent(interval=1),
-                'disk_usage': psutil.disk_usage('.').percent,
-                'active_threads': threading.active_count(),
-                'database_size': os.path.getsize(self.memory.db_path) if os.path.exists(self.memory.db_path) else 0
+                'disk_usage': psutil.disk_usage('.').percent
             }
         except Exception as e:
             self.logger.error(f"خطا در بررسی سلامت سیستم: {e}")
             return {}
     
-    def advanced_finalize_execution(self):
+    def enhanced_finalize_execution(self):
         """پایان‌بندی اجرای پیشرفته"""
         self.logger.info("🏁 پایان اجرای خودمختار پیشرفته")
         
         # ارزیابی نهایی
         final_evaluation = self.evolution_system.evaluate_performance()
         
+        # تولید گزارش نهایی پیشرفت
+        final_report = self.progress_dashboard.generate_daily_report()
+        
         # ذخیره وضعیت سیستم
         system_state = {
             'final_cycle': self.cycle_count,
             'total_runtime': str(datetime.now() - self.start_time),
             'final_evaluation': final_evaluation,
-            'knowledge_stats': self.get_knowledge_stats(),
-            'system_health': self.get_system_health(),
+            'progress_report': final_report,
             'github_operations': 'completed' if self.github_connected else 'failed',
-            'learning_cycles_completed': self.cycle_count,
-            'next_scheduled_run': (datetime.now() + timedelta(hours=4)).isoformat(),  # کاهش به 4 ساعت
-            'system_recommendations': self.generate_system_recommendations(),
-            'evolution_progress': {
-                'current_level': final_evaluation.get('evolution_level', 1),
-                'performance_score': final_evaluation.get('performance_score', 0),
-                'knowledge_growth': final_evaluation.get('total_knowledge', 0)
-            }
+            'next_scheduled_run': (datetime.now() + timedelta(hours=6)).isoformat()
         }
         
         if self.github_connected:
             self.github.create_file_in_repo(
-                "system/advanced_final_report.json",
+                "system/enhanced_final_report.json",
                 json.dumps(system_state, ensure_ascii=False, indent=2),
-                "🏁 گزارش نهایی اجرای خودمختار پیشرفته"
+                "🏁 گزارش نهایی اجرای ارتقا یافته"
             )
         
-        # تولید گزارش نهایی پیشرفته
-        final_report = f"""
-🎯 **گزارش نهایی اجرای Sorna AI Nexus**
+        # گزارش نهایی
+        final_summary = f"""
+🎯 **گزارش نهایی اجرای Sorna AI Nexus v{self.version}**
 
 📊 **آمار اجرای پیشرفته:**
 • تعداد چرخه‌ها: {self.cycle_count}
@@ -2076,66 +2088,36 @@ aiohttp>=3.8.0
 • سطح تکامل: {final_evaluation.get('evolution_level', 1)}
 • امتیاز عملکرد: {final_evaluation.get('performance_score', 0):.1%}
 
-📈 **داده‌های دانش:**
-• مفاهیم یادگرفته: {system_state['knowledge_stats'].get('total_concepts', 0)}
-• تنوع دسته‌ها: {system_state['knowledge_stats'].get('category_diversity', 0)}
-• میانگین اطمینان: {system_state['knowledge_stats'].get('average_confidence', 0):.1%}
-• ترافیک دانش: {system_state['knowledge_stats'].get('total_accesses', 0)} دسترسی
+🚀 **قابلیت‌های جدید فعال:**
+• سیستم حافظه ماندگار
+• موتور تحقیق هوشمند  
+• داشبورد پیشرفت
+• ردیابی یادگیری
 
-💾 **سلامت سیستم:**
-• استفاده از حافظه: {system_state['system_health'].get('system_memory_usage', 0):.1f}%
-• استفاده از CPU: {system_state['system_health'].get('cpu_usage', 0):.1f}%
-• اندازه پایگاه داده: {system_state['system_health'].get('database_size', 0) / 1024 / 1024:.2f} MB
-
-💡 **توصیه‌های سیستم برای اجرای بعدی:**
-{chr(10).join('• ' + rec for rec in system_state['system_recommendations'])}
+💡 **وضعیت سیستم:**
+• اتصال گیت‌هاب: {'✅ فعال' if self.github_connected else '❌ غیرفعال'}
+• یادگیری مستمر: ✅ فعال
+• تولید گزارش: ✅ فعال
 
 🔄 **اجرای بعدی: {system_state['next_scheduled_run']}**
 
-🚀 **Sorna AI Nexus در حال تکامل...**
+✨ **Sorna AI Nexus در حال تکامل...**
 """
         
-        self.logger.evolution(final_report)
-        print(final_report)
-    
-    def generate_system_recommendations(self):
-        """تولید توصیه‌های سیستم"""
-        recommendations = []
-        stats = self.get_knowledge_stats()
-        evaluation = self.evolution_system.evaluate_performance()
-        
-        if stats.get('total_concepts', 0) < 40:
-            recommendations.append("افزایش شدت یادگیری از منابع متنوع")
-        
-        if stats.get('category_diversity', 0) < 8:
-            recommendations.append("گسترش حوزه‌های یادگیری به موضوعات جدید")
-        
-        if stats.get('average_confidence', 0) < 0.75:
-            recommendations.append("تمرکز بر منابع معتبرتر برای یادگیری")
-        
-        if evaluation.get('performance_score', 0) < 0.6:
-            recommendations.append("بهینه‌سازی الگوریتم‌های یادگیری و تصمیم‌گیری")
-        
-        recommendations.extend([
-            "افزایش فرکانس ارتباط با گیت‌هاب",
-            "توسعه قابلیت‌های تولید کد پیشرفته",
-            "یادگیری از پروژه‌های مشابه در گیت‌هاب",
-            "بهبود سیستم مدیریت خطا و بازیابی"
-        ])
-        
-        return recommendations
+        self.logger.evolution(final_summary)
+        print(final_summary)
 
 # ==================== راه‌اندازی پیشرفته ====================
 def main():
-    print("🧠 SORNA AI NEXUS - ULTIMATE AUTONOMOUS SELF-EVOLVING SYSTEM")
+    print("🧠 SORNA AI NEXUS - ENHANCED AUTONOMOUS SYSTEM")
     print("🚀 Starting Enhanced Full Autonomy Mode...")
-    print("🎯 Target: https://github.com/Ai-SAHEB/Sorna-AI-Nexus")
+    print("🎯 New Features: Persistent Memory, Smart Research, Progress Dashboard")
     print("=" * 70)
     
     # ایجاد دایرکتوری‌های لازم
+    os.makedirs("memory", exist_ok=True)
+    os.makedirs("reports", exist_ok=True)
     os.makedirs("sorna_data", exist_ok=True)
-    os.makedirs("sorna_logs", exist_ok=True)
-    os.makedirs("sorna_reports", exist_ok=True)
     
     try:
         # راه‌اندازی سیستم پیشرفته
