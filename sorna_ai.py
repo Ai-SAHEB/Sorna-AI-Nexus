@@ -1,3 +1,4 @@
+# mr_majid@riseup.net
 import os
 import sys
 import json
